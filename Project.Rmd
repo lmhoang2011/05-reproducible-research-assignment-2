@@ -1,0 +1,63 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
+## Executive Summary
+<= 10 complete sentences
+
+## Questions this study considers
+
+### Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+### Across the United States, which types of events have the greatest economic consequences?
+
+## Processing the data set
+## Overview of the data set
+### Loading the data
+```{r}
+dseturl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+dsetzip <- "data/StormData.csv.bz2"
+if (!file.exists(dsetzip)) {
+    download.file(url = dseturl,
+                  destfile = dsetzip,
+                  method = "curl")
+}
+
+d <- read.csv(file = bzfile(dsetzip), strip.white = TRUE)
+
+
+```
+
+## Cleaning the data
+
+Because we want to determine the most costly disasters, we have to
+examine the the property damage (`PROPDMG`) and crop damage
+(`CROPDMG`) values.  These are simple integers which must be
+multiplied by an exponent given in another field (`PROPDMGEXP` and
+`CROPDMGEXP` respectively.  Unfortunately, not all of the exponent
+values are valid; many appear to be rounding or entry errors from
+older entry systems.
+
+For the purposes of this study, we accept only the following values
+for exponent:
+  * H hundred (x100)
+  * K thousand (x1,000)
+  * M million (x1,000,000)
+  * B billion (x1,000,000,000)
+
+```{r}
+gortexp <- function(dmgexp) dmgexp <- switch(toupper(dmgexp), H=100, K=1000, M=1000000, B=1000000000, 1)
+d$pdmgUSD <- mapply(gortexp, d$PROPDMG, d$PROPDMGEXP)
+d$cdmgUSD <- mapply(gortexp, d$CROPDMG, d$CROPDMGEXP)
+## create UTC timestampes for begin and end dates
+## some times are 24-hour mmss ("0130"), others are 12-hour clock strings ("02:18:00 PM")
+
+## USA is defined as the 50 states in the continental US, plus DC, HI and AK; territories, protectorates, and military regions are excluded
+d$isUSA <- mapply( function(st) st %in% state.abb, d$STATE )
+
+
+```
+
+## Results

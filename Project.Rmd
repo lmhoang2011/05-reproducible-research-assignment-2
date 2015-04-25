@@ -9,9 +9,8 @@ output:
 
 ## Questions this study considers
 
-### Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
-
-### Across the United States, which types of events have the greatest economic consequences?
+  1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+  1. Across the United States, which types of events have the greatest economic consequences?
 
 ## Processing the data set
 ## Overview of the data set
@@ -19,6 +18,8 @@ output:
 ```{r}
 dseturl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
 dsetzip <- "data/StormData.csv.bz2"
+dsetrds <- "data/StormData.RDS"
+
 if (!file.exists(dsetzip)) {
     download.file(url = dseturl,
                   destfile = dsetzip,
@@ -51,13 +52,44 @@ for exponent:
 gortexp <- function(dmgexp) dmgexp <- switch(toupper(dmgexp), H=100, K=1000, M=1000000, B=1000000000, 1)
 d$pdmgUSD <- mapply(gortexp, d$PROPDMG, d$PROPDMGEXP)
 d$cdmgUSD <- mapply(gortexp, d$CROPDMG, d$CROPDMGEXP)
-## create UTC timestampes for begin and end dates
-## some times are 24-hour mmss ("0130"), others are 12-hour clock strings ("02:18:00 PM")
+```
 
+To assist in date analysis, we will convert dates to POSIXct format
+
+```{r}
+d$BEGIN_UTC <- mdy(str_extract(d$BGN_DATE, "[^ ]+")
+```
 ## USA is defined as the 50 states in the continental US, plus DC, HI and AK; territories, protectorates, and military regions are excluded
 d$isUSA <- mapply( function(st) st %in% state.abb, d$STATE )
+```
 
-
+In the interest of performance, we will save the data frame as an R data set (`.RDS` file)
+```{r}
+saveRDS(d, file=dsetrds)
+d <- readRDS(dsetrds)
 ```
 
 ## Results
+
+## Appendix
+### Utility functions
+Some functions were used to clean up and normalize the data used in this analysis.  Those functions are defined here
+
+```{r}
+## timeconv() is used to take inconsistent times and convert them to a standard format
+## times will either be 24-hour HHMM ("1330") or 12-hour strings with AM/PM ("01:30:00 PM")
+## functions returns format of 24-hour HH:MM:SS ("13:30:00")
+timeconv <- function(x) {
+    if (nchar(x) == 4) {
+        paste(substr(x,1,2), substr(x,3,4), "00", sep=":")
+    } else {
+        timeadd <- 1
+        if (substr(x,nchar(x)-1,nchar(x)) == "PM") timeadd <- 12
+        paste0(
+            formatC(as.integer(substr(x,1,2)) + timeadd, width=2, format="d", flag="0"),
+            substr(x,3,nchar(x)-3))
+    }
+}
+
+```
+

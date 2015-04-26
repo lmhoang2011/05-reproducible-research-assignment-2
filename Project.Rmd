@@ -5,15 +5,30 @@ output:
     keep_md: true
 ---
 ## Executive Summary
-<= 10 complete sentences
+
+This study U.S. National Oceanic and Atmospheric Administration's
+(NOAA) storm database. This database tracks characteristics of major
+storms and weather events in the United States, including when and
+where they occur, as well as estimates of any fatalities, injuries,
+and property damage.
 
 ## Questions this study considers
 
   1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
   1. Across the United States, which types of events have the greatest economic consequences?
 
+## Notes about the environment used
+This study was done using the following tools, including OS and Programming language versions
+
+The study was conducted on a 64-bit Windows 7 machine with 4 cores.
+
+R language was `r R.version.string`
+
+For publishing to `rbups.com`, I used RStudio version 0.98.1103
+
+The full project may be found on Github at `https://github.com/gregoryg/05-reproducible-research-assignment-2`
+
 ## Processing the data set
-## Overview of the data set
 ### Loading the data
 ```{r}
 dseturl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
@@ -70,20 +85,7 @@ abbreviations, upper and lower case etc. (`thunderstorm`, `gusty
 thundertorm wind`, `gusty wind/rain`, `marine tstm wind`).  We are
 going to attempt to categorize the most impactful events by looking
 for common words and abbreviations in a relative handful of weather
-categories:
-
-| category     | substrings                                              |
-| -----------  | -------------------------------------------------   |
-| excluded     | ^non*                                               |
-| fire         |                                                     |
-| thunderstorm | thunder,tstm,lightning                         |
-| wind/tornado | tornado, wind,^hurricane, funnel                 |
-| winter       | snow,winter,blizzard,sleet, cold          |
-| ice          | ^ice*,freeze                                      |
-| rain         | rain,flood, wet                               |
-| ocean surge  | surf,surge,tide,tsunami,current           |
-| volcano      | volcan                                            |
-| heat         | heat, high\stemp, record\stemp, warm, dry |
+categories.
 
 ```{r}
 generateEvent <- function(evt) {
@@ -105,20 +107,34 @@ d$weatherCategory <- mapply(generateEvent, d$EVTYPE)
 ```
 
 
-## USA is defined as the 50 states in the continental US, plus DC, HI and AK; territories, protectorates, and military regions are excluded
+For purporses of this study, USA is defined as the 50 states in the
+continental US, plus District of Columbia, Hawaii and
+Alaska. territories, protectorates, and military regions are excluded
+
+```{r} 
 d$isUSA <- mapply( function(st) st %in% state.abb, d$STATE )
 ```
 
-In the interest of performance, we will save the data frame as an R data set (`.RDS` file)
+In the interest of performance, we will save the data frame as an R
+data set (`.RDS` file).  After reading, immediately subset the data to
+only those records originating in the US.
+
 ```{r}
 saveRDS(d, file=dsetrds)
 d <- readRDS(dsetrds)
+d <- d[d$isUSA == TRUE,]
 ```
 
 ## Results
   1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
 
+Refer to the result of the query below, which groups US mortalities and injuries by weather category.
 
+```{r}
+library(sqldf)
+harmByWeatherType <- sqldf('select sum(FATALITIES) as deaths, sum(INJURIES) as injuries, weatherCategory,count(*) as sumrecs from d group by weatherCategory  order by injuries desc ')
+harmByWeatherType
+```
 
 ## Appendix
 ### Utility functions

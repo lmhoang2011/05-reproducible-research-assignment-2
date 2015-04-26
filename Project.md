@@ -1,11 +1,19 @@
 # Assessing Health and Economic Impact of Weather Events
-## Executive Summary
+## Synopsis of Study Results
 
 This study U.S. National Oceanic and Atmospheric Administration's
 (NOAA) storm database. This database tracks characteristics of major
 storms and weather events in the United States, including when and
 where they occur, as well as estimates of any fatalities, injuries,
 and property damage.
+
+Wind events, which include tornadoes and hurricanes, are by the far
+the most harmful in aggregate, causing over 100,000 injuries and 90
+deaths over the course of this study.  Though less frequent, severe
+heat events have the highest incidence of deaths and injuries per
+event.  This study finds that severe rain and wind events are by far
+the most costly in terms of dollars spent to replace property and crop
+damage.
 
 ## Questions this study considers
 
@@ -19,11 +27,11 @@ The study was conducted on a 64-bit Windows 7 machine with 4 cores.
 
 R language was R version 3.1.1 (2014-07-10)
 
-For publishing to `rbups.com`, I used RStudio version 0.98.1103
+For publishing to `rpubs.com`, I used RStudio version 0.98.1103
 
 The full project may be found on Github at `https://github.com/gregoryg/05-reproducible-research-assignment-2`
 
-## Processing the data set
+## Data Processing
 ### Set libraries used in this analysis
 
 ```r
@@ -33,53 +41,6 @@ library(sqldf)
 library(ggplot2)
 library(reshape2)
 library(gridExtra)
-## multiplot(), for creating very flexible panel plots using ggplot2
-## it is taken from Cookbook for R http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_(ggplot2)/
-# Multiple plot function
-#
-# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
-# - cols:   Number of columns in layout
-# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
-#
-# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
-# then plot 1 will go in the upper left, 2 will go in the upper right, and
-# 3 will go all the way across the bottom.
-#
-multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
-  library(grid)
-
-  # Make a list from the ... arguments and plotlist
-  plots <- c(list(...), plotlist)
-
-  numPlots = length(plots)
-
-  # If layout is NULL, then use 'cols' to determine layout
-  if (is.null(layout)) {
-    # Make the panel
-    # ncol: Number of columns of plots
-    # nrow: Number of rows needed, calculated from # of cols
-    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
-                    ncol = cols, nrow = ceiling(numPlots/cols))
-  }
-
- if (numPlots==1) {
-    print(plots[[1]])
-
-  } else {
-    # Set up the page
-    grid.newpage()
-    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout), widths=unit(800, "points"), heights=unit(800, "points"))))
-
-    # Make each plot, in the correct location
-    for (i in 1:numPlots) {
-      # Get the i,j matrix positions of the regions that contain this subplot
-      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
-
-      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
-                                      layout.pos.col = matchidx$col))
-    }
-  }
-}
 ```
 ### Loading the data
 
@@ -144,7 +105,7 @@ The manual entry nature of the data causes huge difficulties in
 categorizing the weather events.  For example, you will find high wind
 events entered in completely arbitrary ways, mixing terminology,
 abbreviations, upper and lower case etc. (`thunderstorm`, `gusty
-thundertorm wind`, `gusty wind/rain`, `marine tstm wind`).  We are
+thunderstorm wind`, `gusty wind/rain`, `marine tstm wind`).  We are
 going to attempt to categorize the most impactful events by looking
 for common words and abbreviations in a relative handful of weather
 categories.
@@ -172,7 +133,7 @@ if (!RDSloaded) {
 ```
 
 
-For purporses of this study, USA is defined as the 50 states in the
+For purposes of this study, USA is defined as the 50 states in the
 continental US, plus District of Columbia, Hawaii and
 Alaska. territories, protectorates, and military regions are excluded
 
@@ -198,7 +159,7 @@ d <- d[d$isUSA == TRUE,]
 ```
 
 ## Results
-  1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+### Question 1: Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
 
 Refer to the result of the query below, which groups US mortalities and injuries by weather category.
 
@@ -207,17 +168,43 @@ Refer to the result of the query below, which groups US mortalities and injuries
 harm <- sqldf("select sum(FATALITIES) as deaths, sum(INJURIES) as injuries, weatherCategory,count(*) as sumrecs from d group by weatherCategory ")
 
 harm$weatherCategory <- factor(harm$weatherCategory, levels=harm[order(harm$injuries), "weatherCategory"])
-harm <- sqldf("select *,(injuries/sumrecs)*100 as pctInjuriesPerEvent from harm")
 
 ## ggplot loves long form, which means a type of normalization using melt()
 hdat <- melt(harm, id.vars=c("weatherCategory", "sumrecs"), measure.vars=c("deaths", "injuries"))
 hdat <- sqldf("select *,(value/sumrecs)*100 as pctPerEvent from hdat")
 plot1 <- ggplot(hdat, aes(x=weatherCategory, y=value, fill=variable)) + geom_bar(stat="identity") + coord_flip() + ggtitle("Total Casualties per Weather Type") + xlab("Weather type") + ylab("# Casualties")
 plot2 <- ggplot(hdat, aes(x=weatherCategory, y=pctPerEvent, fill=variable)) + geom_bar(stat="identity") + coord_flip() + ggtitle("Average Casualties per Incident") + xlab("Weather type") + ylab("% Casualties Reported")
-grid.arrange(plot1, plot2, ncol=1)
+grid.arrange(plot1, plot2, ncol=1, sub="Figure 1")
 ```
 
 ![](Project_files/figure-html/findHarmfulEvents-1.png) 
+
+Wind events -- including tornadoes and hurricanes -- have the highest
+impact on health in terms of absolute numbers reported.  Heat events
+-- including fires and heat waves -- show the highest percentage of
+casualties per event.
+
+### Question 2: Across the United States, which types of events have the greatest economic consequences?
+
+
+```r
+crop <- sqldf("select sum(pdmgUSD) as propertyDmgUSD, sum(cdmgUSD) as cropDmgUSD, count(*) as sumrecs, weatherCategory from d group by weatherCategory")
+crop <- sqldf("select *, propertyDmgUSD + cropDmgUSD as totalCost from crop")
+## create long form on crop vs property damage columns
+cdat <- melt(crop, id.vars=c("weatherCategory", "sumrecs", "totalCost"), measure.vars=c("propertyDmgUSD", "cropDmgUSD"))
+cdat <- sqldf("select *, (value/sumrecs) as costPerEvent from cdat")
+cdat$weatherCategory <- factor(cdat$weatherCategory, levels=cdat[order(cdat$propertyDmgUSD + cdat$cropDmgUSD), "weatherCategory"])
+plot3 <- ggplot(cdat, aes(x=weatherCategory, y=value/1000000000, fill=variable)) + geom_bar(stat="identity") + coord_flip() + ggtitle("Damages per Weather Type") + xlab("Weather type") + ylab("Damages in Billions USD")
+grid.arrange(plot3, ncol=1, sub="Figure 2")
+```
+
+![](Project_files/figure-html/unnamed-chunk-1-1.png) 
+
+Rain and wind events are the most costly weather types, both in terms
+of property and damage to crops.  There is a very significant crop
+damage cost in the "uncategorized" weather events.  This bears
+examination, and possibly some re-evaluation of the categorization
+used in this study.  
 
 ## Appendix
 ### Utility functions

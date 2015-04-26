@@ -49,31 +49,60 @@ for exponent:
   * B billion (x1,000,000,000)
 
 ```{r}
-gortexp <- function(dmgexp) dmgexp <- switch(toupper(dmgexp), H=100, K=1000, M=1000000, B=1000000000, 1)
-d$pdmgUSD <- mapply(gortexp, d$PROPDMG, d$PROPDMGEXP)
-d$cdmgUSD <- mapply(gortexp, d$CROPDMG, d$CROPDMGEXP)
+calcUSD <- function(dmg, dmgexp) dmg * switch(toupper(dmgexp), H=100, K=1000, M=1000000, B=1000000000, 1)
+
+d$pdmgUSD <- mapply(calcUSD, d$PROPDMG, d$PROPDMGEXP)
+d$cdmgUSD <- mapply(calcUSD, d$CROPDMG, d$CROPDMGEXP)
 ```
 
 To assist in date analysis, we will convert dates to POSIXct format
 
 ```{r}
-d$BEGIN_UTC <- mdy(str_extract(d$BGN_DATE, "[^ ]+")
+library(stringr)
+library(lubridate)
+d$BEGIN_UTC <- mdy(str_extract(d$BGN_DATE, "[^ ]+"))
 ```
 
-The manual entry nature of the data causes huge difficulties in categorizing events.  For example, you will find high wind events entered in completely arbitrary ways, mixing terminology, abbreviations, upper and lower case etc. (`thunderstorm`, `gusty thundertorm wind`, `gusty wind/rain`, `marine tstm wind`).  We are going to attempt to categorize the most impactful events by looking for common words and abbreviations in a relative handful of weather categories:
+The manual entry nature of the data causes huge difficulties in
+categorizing the weather events.  For example, you will find high wind
+events entered in completely arbitrary ways, mixing terminology,
+abbreviations, upper and lower case etc. (`thunderstorm`, `gusty
+thundertorm wind`, `gusty wind/rain`, `marine tstm wind`).  We are
+going to attempt to categorize the most impactful events by looking
+for common words and abbreviations in a relative handful of weather
+categories:
 
-| category     | regexp                                              |
+| category     | substrings                                              |
 | -----------  | -------------------------------------------------   |
 | excluded     | ^non*                                               |
 | fire         |                                                     |
-| thunderstorm | *thunder*,tstm*,*lightning*                         |
-| wind/tornado | tornado*, wind,^hurricane, *funnel*                 |
-| winter       | *snow*,*winter*,*blizzard*,*sleet*, *cold*          |
-| ice          | ^ice*,*freeze*                                      |
-| rain         | *rain*,*flood*, *wet*                               |
-| ocean surge  | *surf*,*surge*,*tide*,*tsunami*,*current*           |
-| volcano      | *volcan*                                            |
-| heat         | *heat*, *high\stemp*, *record\stemp*, *warm*, *dry* |
+| thunderstorm | thunder,tstm,lightning                         |
+| wind/tornado | tornado, wind,^hurricane, funnel                 |
+| winter       | snow,winter,blizzard,sleet, cold          |
+| ice          | ^ice*,freeze                                      |
+| rain         | rain,flood, wet                               |
+| ocean surge  | surf,surge,tide,tsunami,current           |
+| volcano      | volcan                                            |
+| heat         | heat, high\stemp, record\stemp, warm, dry |
+
+```{r}
+generateEvent <- function(evt) {
+    evt <- tolower(evt)
+    ifelse(grepl("lightning", evt), "lightning",
+           ifelse(grepl("hail", evt), "hail",
+                  ifelse(grepl("rain|flood|wet|fld", evt), "rain",
+                         ifelse(grepl("snow|winter|wintry|blizzard|sleet|cold|ice|freeze|avalanche|icy", evt), "winter",
+                                ifelse(grepl("thunder|tstm|tornado|wind|hurricane|funnel|tropical +storm", evt), "wind",
+                                       ifelse(grepl("fire", evt), "fire",
+                                              ifelse(grepl("fog|visibility|dark|dust", evt), "low visibility",
+                                                     ifelse(grepl("surf|surge|tide|tsunami|current", evt), "ocean surge",
+                                                            ifelse(grepl("heat|high +temp|record +temp|warm|dry", evt), "heat",
+                                                                   ifelse(grepl("volcan", evt), "volcanic activity",
+                                                                          "uncategorized"
+                                                                          ))))))))))
+}
+d$weatherCategory <- mapply(generateEvent, d$EVTYPE)
+```
 
 
 ## USA is defined as the 50 states in the continental US, plus DC, HI and AK; territories, protectorates, and military regions are excluded

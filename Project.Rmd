@@ -188,7 +188,6 @@ crop <- sqldf("select *, propertyDmgUSD + cropDmgUSD as totalCost from crop")
 ## create long form on crop vs property damage columns
 cdat <- melt(crop, id.vars=c("weatherCategory", "sumrecs", "totalCost"), measure.vars=c("propertyDmgUSD", "cropDmgUSD"))
 cdat <- sqldf("select *, (value/sumrecs) as costPerEvent from cdat")
-cdat$weatherCategory <- factor(cdat$weatherCategory, levels=cdat[order(cdat$propertyDmgUSD + cdat$cropDmgUSD), "weatherCategory"])
 plot3 <- ggplot(cdat, aes(x=weatherCategory, y=value/1000000000, fill=variable)) + geom_bar(stat="identity") + coord_flip() + ggtitle("Damages per Weather Type") + xlab("Weather type") + ylab("Damages in Billions USD")
 grid.arrange(plot3, ncol=1, sub="Figure 2")
 
